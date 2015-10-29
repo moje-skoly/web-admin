@@ -1,0 +1,46 @@
+<?php
+
+namespace AppBundle\Entity;
+
+use Doctrine\ORM\Mapping as ORM;
+
+/**
+ * @ORM\Entity
+ * @ORM\Table(name="log")
+ */
+class Log {
+	/**
+     * @ORM\Id
+     * @ORM\Column(type="integer")
+     * @ORM\GeneratedValue
+     */
+    protected $id;
+
+    /**
+     * @ORM\ManyToOne(targetEntity="School", inversedBy="log")
+     * @ORM\JoinColumn(name="school_id", referencedColumnName="id")
+     */
+    protected $school;
+
+    /**
+     * @ORM\ManyToOne(targetEntity="Level", inversedBy="log")
+     * @ORM\JoinColumn(name="level_id", referencedColumnName="id")
+     */
+    protected $level;
+
+    /**
+     * @ORM\ManyToOne(targetEntity="User", inversedBy="log")
+     * @ORM\JoinColumn(name="user_id", referencedColumnName="id")
+     */
+    protected $user;
+
+    /**
+     * @ORM\Column(type="datetime",name="logged_on")
+     */
+    protected $loggedOn;    
+
+    /**
+     * @ORM\Column(type="text",name="json_data")
+     */
+    protected $jsonData;
+}
