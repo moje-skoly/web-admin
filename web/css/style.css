@@ -1,0 +1,16 @@
+/** LAYOUT **/
+
+#content {
+	margin-top: 87px;
+}
+
+/** DATAGRID **/
+
+.grid .grid-filter-operator select {
+	width: 40%;
+}
+
+.grid .grid-filter-input-query select,
+.grid .grid-filter-input-query input {
+	width: 48%;
+}
