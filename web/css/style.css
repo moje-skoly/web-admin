@@ -14,3 +14,7 @@
 .grid .grid-filter-input-query input {
 	width: 48%;
 }
+
+.grid .grid-column-__actions {
+	white-space: nowrap;
+}

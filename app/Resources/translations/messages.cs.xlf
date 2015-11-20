@@ -3,8 +3,8 @@
     <file source-language="cs" target-language="cs" datatype="plaintext" original="file.ext">
         <body>
             <trans-unit id="1">
-                <source>like</source>
-                <target>LIKE</target>
+                <source>registration.submit</source>
+                <target>Přidat uživatele</target>
             </trans-unit>
         </body>
     </file>

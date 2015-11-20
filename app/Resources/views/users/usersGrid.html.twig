@@ -2,6 +2,13 @@
 
 {% block content %}
 
+<p class="pull-right">
+	<br>
+	<a href="{{ path('fos_user_registration_register') }}" class="btn btn-success">Přidat uživatele</a>
+</p>
+
+<h1>Uživatelé</h1>
+
 <div class="container">
 	{{ grid(grid) }}
 </div>

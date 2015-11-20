@@ -40,9 +40,9 @@ registration:
     check_email: Na adresu %email% byl zaslán aktivační e-mail. Obsahuje aktivační odkaz, na který je nutné kliknout pro aktivaci Vašeho účtu.
     confirmed: Gratulujeme, %username%, Váš účet je nyní aktivní.
     back: Návrat na předchozí stránku.
-    submit: Registrovat se
+    submit: Přidat uživatele
     flash:
-        user_created: Váš účet byl úspěšně vytvořen
+        user_created: Nový uživatel byl úspěšně vytvořen
     email:
         subject: Vítejte, %username%!
         message: |
