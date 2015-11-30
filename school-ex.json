@@ -1,0 +1,54 @@
+{
+	"RED-IZO": "600148459",
+  "metadata": {
+    "name": "Základní škola Šumperk, 8. května 63",
+		"headmaster": {
+			"name": "Mgr. Radovan Pavelka"
+		},
+		"contact": {
+			"phoneNumbers": [ "583 212 865" ],
+			"emails": [ "pavelka@hluchak.cz" ],
+			"website": "www.hluchak.cz"
+		},
+		"address": {
+			"street": "8. května 63",
+			"city":	"Šumperk",
+			"postalCode": "787 01",
+			"region": "Olomoucký",
+			"location": {
+				"lat": 49.9666144,
+				"lon": 16.9927583
+			}
+		}
+  },
+  "units": [
+    {
+      "IZO": "181050901",
+      "type": "Základní škola",
+      "metadata": {
+        "name": "Základní škola Šumperk, 8. května 63",
+    		"address": {
+    			"street": "8. května 63",
+    			"city":	"Šumperk",
+    			"postalCode": "787 01",
+    			"region": "Olomoucký",
+    			"location": {
+    				"lat": 49.9666144,
+    				"lon": 16.9927583
+    			}
+    		},
+    		"contact": { }
+      },
+      "information": [
+        { "item": "Kapacita", "number": 700 },
+        { "item": "Dny otevřených dveří", "text": "27. 11. 2015, 8 - 9. 2. 2016, 28. 5. 2016" },
+        { "item": "Bezbariérový přístup", "boolean": true },
+        {
+          "item": "Jazyky",
+          "array": [ "angličtina", "francouzština", "japonština" ],
+          "text": "angličtina, francouzština, japonština"
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,16 @@
 # Learn more about services, parameters and containers at
 # http://symfony.com/doc/current/book/service_container.html
 parameters:
-#    parameter_name: value
+    transformator.token: "ece59a72-9637-4205-80de-fb2b5d39a275"
+
+    data.msmt: "http://stistko.uiv.cz/rejstrik/rejstrik_151103.zip"
+
+
 
 services:
+#    service_name:
+#        class: AppBundle\Directory\ClassName
+#        arguments: ["@another_service_name", "plain_value", "%parameter_name%"]
     app.form.registration:
         class: AppBundle\Form\RegistrationType
         tags:
@@ -13,6 +20,11 @@ services:
         arguments: [@router]
         tags:
             - { name: kernel.event_subscriber }
-#    service_name:
-#        class: AppBundle\Directory\ClassName
-#        arguments: ["@another_service_name", "plain_value", "%parameter_name%"]
+    transformator.listener.token_listener:
+        class: TransformatorBundle\EventListener\TokenListener
+        arguments: ["%transformator.token%"]
+        tags:
+            - { name: kernel.event_listener, event: kernel.controller, method: onKernelController }
+    transformator.utils.file_operations:
+        class: TransformatorBundle\Utils\FileOperations
+        arguments: ["%data.msmt%"]
