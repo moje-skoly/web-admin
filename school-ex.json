@@ -39,14 +39,15 @@
     		},
     		"contact": { }
       },
-      "information": [
-        { "item": "Kapacita", "number": 700 },
-        { "item": "Dny otevřených dveří", "text": "27. 11. 2015, 8 - 9. 2. 2016, 28. 5. 2016" },
-        { "item": "Bezbariérový přístup", "boolean": true },
+      "sections": [
         {
-          "item": "Jazyky",
-          "array": [ "angličtina", "francouzština", "japonština" ],
-          "text": "angličtina, francouzština, japonština"
+          "title": "Obecné informace",
+          "information": [
+            { "key": "Kapacita", "value": "700", "format": "number" },
+            { "key": "Dny otevřených dveří", "text": "27. 11. 2015, 8 - 9. 2. 2016, 28. 5. 2016" },
+            { "key": "Bezbariérový přístup", "value": "ano" },
+            { "key": "Jazyky", "value": "angličtina, francouzština, japonština" }
+          ]
         }
       ]
     }

@@ -25,7 +25,10 @@
         "twbs/bootstrap": "^3.3",
         "symfony/var-dumper": "^2.7",
         "apy/datagrid-bundle": "^2.2",
-        "league/csv": "^7.2"
+        "league/csv": "^7.2",
+        "symfony/filesystem": "^3.0",
+        "nette/utils": "^2.3",
+        "elasticsearch/elasticsearch": "^2.1"
     },
     "require-dev": {
         "sensio/generator-bundle": "~2.3"

@@ -14,10 +14,10 @@ class LoadUserData implements FixtureInterface
     {
         $levels = [
             [ 'priority' => 1, 'name' => "Uživatel" ],
-            [ 'priority' => 2, 'name' => "Škola" ],
-            [ 'priority' => 3, 'name' => "ČŠI" ],
-            [ 'priority' => 4, 'name' => "MŠMT" ],
-            [ 'priority' => 5, 'name' => "Zřizovatel" ]
+            [ 'priority' => 2, 'name' => "ČŠI" ],
+            [ 'priority' => 3, 'name' => "Škola" ],
+            [ 'priority' => 4, 'name' => "Zřizovatel" ],
+            [ 'priority' => 5, 'name' => "MŠMT" ]
         ];
 
         foreach ($levels as $levelData) {

@@ -14,11 +14,11 @@ imports:
 #        query_cache_driver: apc
 
 parameters:
-    database_host: %graviton_vcap.naseskoly_admin_db.host%
-    database_port: %graviton_vcap.naseskoly_admin_db.port%
-    database_name: %graviton_vcap.naseskoly_admin_db.db%
-    database_user: %graviton_vcap.naseskoly_admin_db.username%
-    database_password: %graviton_vcap.naseskoly_admin_db.password%
+    database_host:     wm86.wedos.net
+    database_port:
+    database_name:     d100412_ns
+    database_user:     a100412_ns
+    database_password: gj75hJ3W
 
 monolog:
     handlers:

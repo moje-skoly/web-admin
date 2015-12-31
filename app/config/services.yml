@@ -2,10 +2,12 @@
 # http://symfony.com/doc/current/book/service_container.html
 parameters:
     transformator.token: "ece59a72-9637-4205-80de-fb2b5d39a275"
-
     data.msmt: "http://stistko.uiv.cz/rejstrik/rejstrik_151103.zip"
 
-
+    # elastic credentials
+    elastic.address: "http://134.168.35.125:9200/"
+    elastic.index: "nase-skoly"
+    elastic.type: "school"
 
 services:
 #    service_name:
@@ -27,4 +29,8 @@ services:
             - { name: kernel.event_listener, event: kernel.controller, method: onKernelController }
     transformator.utils.file_operations:
         class: TransformatorBundle\Utils\FileOperations
-        arguments: ["%data.msmt%"]
+        arguments: ["@security.token_storage", "@doctrine.orm.entity_manager", "%data.msmt%"]
+
+    transformator.utils.build:
+        class: TransformatorBundle\Utils\Build
+        arguments: ["@security.token_storage", "@doctrine.orm.entity_manager", "%elastic.address%", "%elastic.index%", "%elastic.type%"]

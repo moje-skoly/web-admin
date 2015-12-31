@@ -37,7 +37,7 @@ class Log {
     /**
      * @ORM\Column(type="datetime",name="logged_on")
      */
-    protected $loggedOn;    
+    protected $loggedOn;
 
     /**
      * @ORM\Column(type="text",name="json_data")

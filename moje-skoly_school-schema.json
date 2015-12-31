@@ -21,22 +21,33 @@
       }
     }
   },
-  "required": [ "metadata", "units", "RED-IZO" ],
+  "required": [ "RED-IZO", "metadata", "units" ],
   "definitions": {
     "address": {
       "properties": {
         "street": { "type": "string" },
         "city": { "type": "string" },
         "postalCode": { "type": "string" },
-        "region": { "type": "string" },
+        "ruianCode": { "type": "string" },
         "location": {
           "type": "object",
           "description": "The geographical coordinates of the main school building or its unit.",
           "properties": {
             "lat": { "type": "number" },
             "lon": {  "type": "number" }
-          }
-        }
+          },
+          "required": [ "lat", "lon" ]
+        },
+        "googleMapId": { "type": "string" }
+      },
+      "required": [ "street", "city", "postalCode", "location" ]
+    },
+    "unitAddress": {
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "postalCode": { "type": "string" },
+        "ruianCode": { "type": "string" }
       }
     },
     "contact": {
@@ -68,7 +79,12 @@
           "description": "The information about the headmaster of the school or its unit.",
           "properties": {
             "name": { "type": "string" }
-          }
+          },
+          "required": [ "name" ]
+        },
+        "founder": {
+          "description": "The founding entity of the school.",
+          "type": "string"
         },
         "contact": {
           "type": "object",
@@ -79,94 +95,76 @@
           "$ref": "#/definitions/address"
         }
       },
+      "required": [ "name", "address" ]
+    },
+    "unitMetadata": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The name of the school or its unit.",
+          "type": "string"
+        },
+        "ICO": {
+          "type": "string",
+          "description": "Identification number of the organization."
+        },
+        "contact": {
+          "type": "object",
+          "$ref": "#/definitions/contact"
+        },
+        "address": {
+          "type": "object",
+          "$ref": "#/definitions/unitAddress"
+        }
+      },
       "required": [ "name" ]
     },
     "unit": {
       "type": "object",
       "properties": {
         "IZO": { "type": "string" },
-        "type": { "type": "string" },
+        "unitType": { "type": "string" },
         "metadata": {
           "type": "object",
-          "$ref": "#/definitions/metadata"
+          "$ref": "#/definitions/unitMetadata"
         },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/sections"
+          }
+        }
+      },
+      "required": [ "IZO", "unitType", "metadata" ]
+    },
+    "sections": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
         "information": {
           "type": "array",
           "items": {
             "type": "object",
-            "oneOf": [
-              { "$ref": "#/definitions/numericItem" },
-              { "$ref": "#/definitions/textualItem" },
-              { "$ref": "#/definitions/booleanItem" },
-              { "$ref": "#/definitions/arrayItem" }
-            ]
+            "$ref": "#/definitions/pieceOfInformation"
           }
         }
       },
-      "required": [ "IZO", "type", "metadata", "information" ]
+      "required": [ "title", "information" ]
     },
-    "numericItem": {
+    "pieceOfInformation": {
       "type": "object",
       "properties": {
-        "item": {
+        "key": {
           "description": "The title of the piece of information.",
           "type": "string"
         },
-        "number": {
-          "description": "The numeric value of the item.",
-          "type": "integer"
-        }
-      },
-      "required": [ "item", "number" ]
-    },
-    "textualItem": {
-      "type": "object",
-      "properties": {
-        "item": {
-          "description": "The title of the piece of information.",
-          "type": "string"
-        },
-        "text": {
+        "value": {
           "description": "The textual value of the item.",
           "type": "string"
         }
       },
-      "required": [ "item", "text" ]
-    },
-    "booleanItem": {
-      "type": "object",
-      "properties": {
-        "item": {
-          "description": "The title of the piece of information.",
-          "type": "string"
-        },
-        "boolean": {
-          "description": "The boolean value of the item.",
-          "type": "boolean"
-        }
-      },
-      "required": [ "item", "boolean" ]
-    },
-    "arrayItem": {
-      "type": "object",
-      "properties": {
-        "item": {
-          "description": "The title of the piece of information.",
-          "type": "string"
-        },
-        "array": {
-          "description": "The list of separate values",
-          "type": "array",
-          "items": {
-            "oneOf": [
-              { "type": "string" },
-              { "type": "number" },
-              { "type": "boolean" }
-            ]
-          }
-        }
-      },
-      "required": [ "item", "array" ]
+      "required": [ "key", "value" ]
     }
   }
 }

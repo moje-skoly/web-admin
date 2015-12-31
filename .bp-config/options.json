@@ -1,6 +1,4 @@
 {
     "WEBDIR": "web",
-	"LIBDIR": ".",
-	"COMPOSER_INSTALL_OPTIONS": ["--no-dev"]
-	//"ADDITIONAL_PREPROCESS_CMDS": "php $HOME/php/bin/composer.phar install --no-dev --no-progress"
+	"LIBDIR": "."
 }
