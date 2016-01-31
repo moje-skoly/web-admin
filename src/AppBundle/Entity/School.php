@@ -28,6 +28,16 @@ class School
     protected $name;
 
     /**
+     * @ORM\Column(type="text",name="last_build_json_data", nullable=true)
+     */
+    protected $lastBuildJsonData;
+
+    /**
+     * @ORM\Column(type="boolean",name="is_valid")
+     */
+    protected $isValid;
+
+    /**
      * Get id
      *
      * @return integer
@@ -83,5 +93,53 @@ class School
     public function getName()
     {
         return $this->name;
+    }
+
+    /**
+     * Set lastBuildJsonData
+     *
+     * @param string $lastBuildJsonData
+     *
+     * @return School
+     */
+    public function setLastBuildJsonData($lastBuildJsonData)
+    {
+        $this->lastBuildJsonData = $lastBuildJsonData;
+
+        return $this;
+    }
+
+    /**
+     * Get lastBuildJsonData
+     *
+     * @return string
+     */
+    public function getLastBuildJsonData()
+    {
+        return $this->lastBuildJsonData;
+    }
+
+    /**
+     * Set isValid
+     *
+     * @param bool $isValid
+     *
+     * @return School
+     */
+    public function setIsValid($isValid)
+    {
+        $this->isValid = $isValid;
+
+        return $this;
+    }
+
+    /**
+     * Get isValid
+     *
+     * @return bool
+     */
+    public function getIsValid()
+    {
+        return $this->isValid;
     }
 }

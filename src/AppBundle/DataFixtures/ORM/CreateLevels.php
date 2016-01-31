@@ -13,6 +13,7 @@ class LoadUserData implements FixtureInterface
     public function load(ObjectManager $manager)
     {
         $levels = [
+            [ 'priority' => 0, 'name' => "Auto:location" ],
             [ 'priority' => 1, 'name' => "Uživatel" ],
             [ 'priority' => 2, 'name' => "ČŠI" ],
             [ 'priority' => 3, 'name' => "Škola" ],

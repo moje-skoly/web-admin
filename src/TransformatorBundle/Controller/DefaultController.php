@@ -38,7 +38,7 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
         return new Response("DONE");
     }
 
-     /**
+    /**
      * @Route("/build/buildAll", name="build")
      */
     public function buildAction(Request $request)
@@ -48,6 +48,35 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
         $build = $this->get('transformator.utils.build');
 
         $build->build();
+
+        return new Response("DONE");
+    }
+
+    /**
+     * @Route("/build/pushToElastic", name="pushToElastic")
+     */
+    public function pushToElasticAction(Request $request)
+    {
+        ini_set('max_execution_time', 60 * 60 * 10); // 10 hours :-P
+        ini_set('memory_limit', '1G');
+        $build = $this->get('transformator.utils.build');
+
+        $build->pushToElastic();
+
+        return new Response("DONE");
+    }
+
+
+    /**
+     * @Route("/build/cacheSchoolLocation", name="cacheSchoolLocation")
+     */
+    public function cacheSchoolLocation(Request $request)
+    {
+        ini_set('max_execution_time', 60 * 60 * 10); // 10 hours :-P
+        ini_set('memory_limit', '1G');
+        $build = $this->get('transformator.utils.build');
+
+        $build->cacheSchoolLocation();
 
         return new Response("DONE");
     }

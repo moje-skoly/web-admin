@@ -4,8 +4,8 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "hash": "23302cd580f56ea56fce7a0fd5388915",
-    "content-hash": "3a047a7159bdfa0159ccebc52b220009",
+    "hash": "110c47525623a031c24f49cf9e199bef",
+    "content-hash": "dd46f3f7a4372429b34479692de9eca4",
     "packages": [
         {
             "name": "apy/datagrid-bundle",
@@ -67,6 +67,55 @@
                 "symfony"
             ],
             "time": "2015-05-10 10:49:52"
+        },
+        {
+            "name": "ci/restclientbundle",
+            "version": "0.3.1",
+            "target-dir": "Ci/RestClientBundle",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/CircleOfNice/CiRestClientBundle.git",
+                "reference": "9dcd1241e05b0bb1a007fefaacae815c60638de1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/CircleOfNice/CiRestClientBundle/zipball/9dcd1241e05b0bb1a007fefaacae815c60638de1",
+                "reference": "9dcd1241e05b0bb1a007fefaacae815c60638de1",
+                "shasum": ""
+            },
+            "require-dev": {
+                "php": ">=5.4",
+                "symfony/config": ">=2.1",
+                "symfony/dependency-injection": ">=2.1",
+                "symfony/http-kernel": ">=2.1",
+                "symfony/yaml": ">=2.1"
+            },
+            "type": "symfony-bundle",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "0.3-dev"
+                }
+            },
+            "autoload": {
+                "psr-0": {
+                    "Ci\\RestClientBundle": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL"
+            ],
+            "authors": [
+                {
+                    "name": "Circle.ai",
+                    "email": "info@circle.ai"
+                }
+            ],
+            "description": "Provides REST request methods. Mapper bundle for php internal curl library",
+            "keywords": [
+                "REST client curl POST GET PUT DELETE OPTIONS CONNECT PATCH TRACE HEAD content-type payload library plugin"
+            ],
+            "time": "2015-12-09 12:56:52"
         },
         {
             "name": "dg/adminer-custom",
@@ -1068,7 +1117,7 @@
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FriendsOfSymfony/FOSUserBundle/zipball/e39b040e272c72f0a090c67d802e1d3b2d0b0313",
+                "url": "https://api.github.com/repos/FriendsOfSymfony/FOSUserBundle/zipball/e5e7a2b8984da8dfedaf44adc7e5f60a62ad280c",
                 "reference": "e39b040e272c72f0a090c67d802e1d3b2d0b0313",
                 "shasum": ""
             },

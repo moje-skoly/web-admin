@@ -20,6 +20,7 @@ class AppKernel extends Kernel
             new FOS\UserBundle\FOSUserBundle(),
             new Doctrine\Bundle\FixturesBundle\DoctrineFixturesBundle(),
             new APY\DataGridBundle\APYDataGridBundle(),
+            new Ci\RestClientBundle\CiRestClientBundle(),
             new AppBundle\AppBundle(),
             new TransformatorBundle\TransformatorBundle(),
         );

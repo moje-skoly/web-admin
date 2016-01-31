@@ -14,6 +14,8 @@ use AppBundle\Entity;
 
 class Build {
 
+    private $restClient;
+
 	private $msmtUrl;
     private $user;
     private $schoolRepository;
@@ -23,9 +25,12 @@ class Build {
 
     private $currentSchool;
     private $reportEnabled = TRUE;
+    private $locationLevel = NULL;
 
-	public function __construct(TokenStorage $tokenStorage, $entityManager, $elasticAddress, $elasticIndex, $elasticType) {
+	public function __construct(TokenStorage $tokenStorage, $restClient, $entityManager, $elasticAddress, $elasticIndex, $elasticType) {
         mb_internal_encoding("UTF-8");
+
+        $this->restClient = $restClient;
 
         // testing mode
         if ($tokenStorage->getToken() === NULL)
@@ -55,29 +60,28 @@ class Build {
      * - merge the results according to priority
      */
     public function build() {
-        $documents = $this->retrieveExistingDocuments();
-
-        $schools = $this->schoolRepository->findAll();
+        $schools = $this->em->createQuery("SELECT s FROM AppBundle:School s")->iterate();
         $levels = $this->levelRepository->findBy([], [ 'priority' => 'DESC' ]);
+        $levelIds = [];
+        foreach ($levels as $level) {
+            $levelIds[] = $level->getId();
+        }
 
         $total = 0;
         $successful = 0;
-        $inserted = 0;
-        $updated = 0;
-        $wasUpdate = FALSE;
-        $wasInsert = FALSE;
         foreach ($schools as $school) {
+            $school = $school[0];
             $schoolJson = new \stdClass;
 
             $empty = TRUE;
-            foreach ($levels as $level) {
+            foreach ($levelIds as $levelId) {
                 $log = $this->em->createQuery(
                     "SELECT l
                     FROM AppBundle:Log l
                     WHERE l.school = :school_id AND l.level = :level_id
                     ORDER BY l.loggedOn DESC"
                 )->setParameter('school_id', $school->getId())
-                ->setParameter('level_id', $level->getId())
+                ->setParameter('level_id', $levelId)
                 ->setMaxResults(1)
                 ->getOneOrNullResult();
 
@@ -91,48 +95,183 @@ class Build {
                 $schoolJson = $this->mergeObjects($schoolJson, $json);
             }
 
+            $isValid = $empty ? FALSE : $this->validateDocument($schoolJson);
+
+            $school->setLastBuildJsonData(Json::encode($schoolJson));
+            $school->setIsValid($isValid);
+            if ($isValid) {
+                $successful++;
+            }
+
+            if ($total % 100 == 0) {
+                $this->em->flush();
+                $this->em->clear();
+            }
+
+            // dump(Json::encode($schoolJson, Json::PRETTY));
+
+            $total++;
+        }
+        $this->em->flush();
+
+        dump("successful: $successful/$total");
+    }
+
+    public function cacheSchoolLocation() {
+
+        $total = 0;
+        $successful = 0;
+
+        $schools = $this->em->createQuery(
+            "SELECT s
+            FROM AppBundle:School s
+            WHERE s.isValid = 0"
+        )->iterate();
+
+        foreach ($schools as $row) {
+            $school = $row[0];
+
+            $schoolJson = Json::decode($school->getLastBuildJsonData());
+            if (isset($schoolJson->metadata->address) && !isset($schoolJson->metadata->address->location)) {
+                $url = $this->createNominatimUrl($schoolJson->metadata->address);
+                //dump($url);
+                //continue;
+                $json = "";
+                try {
+                    $response = $this->restClient->get($url);
+                    $json = $response->getContent();
+                } catch (Ci\RestClientBundle\Exceptions\OperationTimedOutException $exception) {
+                    dump("Couldn't retrieve location information, server not responding.");
+                    continue;
+                }
+
+                try {
+                    $location = Json::decode($json);
+                } catch (JsonException $e) {
+                    dump($e->getMessage());
+                    dump($json);
+                    break;
+                }
+                if (is_array($location) && count($location) > 0) {
+                    if (isset($location[0]->lat) && isset($location[0]->lon)) {
+                        $this->logSchoolLocation($school, $location[0]->lat, $location[0]->lon);
+                        $successful++;$this->em->flush();
+                    }
+                }
+
+                if (($total + 1) % 100 == 0) {
+                    $this->em->flush();
+                }
+
+                usleep(600000); // sleep for one second
+            }
+
+            $total++;
+        }
+
+        $this->em->flush();
+
+        dump("successful: $successful/$total");
+    }
+
+    public function createNominatimUrl($address) {
+        $url = 'http://nominatim.openstreetmap.org/search?format=json&countrycodes=CZ';
+        if (!empty($address->street)) {
+            $url .= "&street=" . urlencode($address->street);
+        } else {
+            $url .= "&city=" . urlencode($address->city);
+        }
+
+        $url .= "&postalcode=" . urlencode($address->postalCode);
+        return $url;
+    }
+
+    public function logSchoolLocation($school, $lat, $lon) {
+        $json = new \stdClass;
+        $json->metadata = new \stdClass;
+        $json->metadata->address = new \stdClass;
+        $json->metadata->address->location = new \stdClass;
+        $json->metadata->address->location->lat = $lat;
+        $json->metadata->address->location->lon = $lon;
+
+        $data = NULL;
+        try {
+            $data = Json::encode($json);
+        } catch (JsonException $e) {
+            dump("2");
+            dump($json);
+            dump($e->getMessage());
+            return;
+        }
+
+        if ($this->locationLevel === NULL) {
+            $level = $this->levelRepository->findOneByName('Auto:location');
+        }
+
+        $log = new Entity\Log();
+        $log->setLevel($level);
+        $log->setSchool($school);
+        $log->setLoggedOn(new \Datetime());
+        $log->setUser($this->user);
+        $log->setJsonData($data);
+
+        $this->em->persist($log);
+    }
+
+    public function pushToElastic() {
+        $documents = $this->retrieveExistingDocuments();
+        $schools = $this->em->createQuery(
+            "SELECT s
+            FROM AppBundle:School s
+            WHERE s.isValid = 1"
+        )->getResult();
+
+        $total = 0;
+        $successful = 0;
+        $inserted = 0;
+        $updated = 0;
+        $deleted = 0;
+
+        foreach ($schools as $school) {
             $params = [
                 'index' => $this->elasticIndex,
                 'type' => $this->elasticType
             ];
-            dump(Json::encode($schoolJson, Json::PRETTY));
 
-            $isValid = $empty ? FALSE : $this->validateDocument($schoolJson);
-            dump($isValid);
-
-            if (!$isValid) { // the school has no data or isn't valid
-                // delete from elastic if present
-                if (array_key_exists($school->getCode(), $documents)) {
-                    $params['id'] = $documents[$school->getCode()];
-                    $response = $this->elastic->delete($params);
-                }
+            $response = NULL;
+            if (array_key_exists($school->getCode(), $documents)) {
+                $params['id'] = $documents[$school->getCode()];
+                $updated++;
+                unset($documents[$school->getCode()]); // remove the array item, so we have the non-existing remaining only
             } else {
-                $schoolJson = (array) $schoolJson;
-                $response = NULL;
-                if (array_key_exists($schoolJson['RED-IZO'], $documents)) {
-                    $params['id'] = $documents[$schoolJson['RED-IZO']];
-                    $params['body'] = [ 'doc' => $schoolJson ];
-                    $response = $this->elastic->update($params);
-                    $updated++;
-                } else {
-                    $params['body'] = $schoolJson;
-                    $response = $this->elastic->index($params);
-                    $inserted++;
-                }
+                $inserted++;
+            }
 
-                if (isset($response['_id'])) {
-                    $successful++;
-                }
+            $params['body'] = $school->getLastBuildJsonData();
+            $response = $this->elastic->index($params);
+
+            if (isset($response['_id'])) {
+                $successful++;
             }
 
             $total++;
-            if ($total >= 100)
-                break;
+        }
+
+        $deleted = 0;
+        foreach ($documents as $redizo => $document) {
+            $params = [
+                'index' => $this->elasticIndex,
+                'type' => $this->elasticType
+            ];
+            $params['id'] = $id;
+            $response = $this->elastic->delete($params);
+            $deleted++;
         }
 
         dump("successful: $successful/$total");
         dump("updated: $updated");
         dump("inserted: $inserted");
+        dump("deleted: $deleted");
     }
 
     public function retrieveExistingDocuments() {
@@ -279,17 +418,14 @@ class Build {
             foreach ($document->units as $key => $unit) {
                 // validate each unit
 
-                if (!isset($unit->IZO) || !isset($unit->metadata) || !isset($unit->type)) {
+                if (!isset($unit->IZO) || !isset($unit->metadata) || !isset($unit->unitType)) {
                     unset($document->units[$key]);
                     continue;
                 } else {
                     $this->removeRedundant($unit, ["IZO", "unitType", "metadata", "sections"]);
                 }
 
-                if (!$this->validateUnitMetadata($unit->metadata)) {
-                    $this->report("Invalid metadata of a unit with IZO = $unit->IZO.");
-                    return FALSE;
-                }
+                $this->validateUnitMetadata($unit->metadata);
 
                 if (isset($unit->sections)) {
                     foreach ($unit->sections as $key => $section) {

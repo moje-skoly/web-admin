@@ -33,4 +33,4 @@ services:
 
     transformator.utils.build:
         class: TransformatorBundle\Utils\Build
-        arguments: ["@security.token_storage", "@doctrine.orm.entity_manager", "%elastic.address%", "%elastic.index%", "%elastic.type%"]
+        arguments: ["@security.token_storage", "@ci.restclient", "@doctrine.orm.entity_manager", "%elastic.address%", "%elastic.index%", "%elastic.type%"]

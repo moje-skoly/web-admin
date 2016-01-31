@@ -95,3 +95,9 @@ fos_user:
     registration:
         form:
             type: app_user_registration
+
+
+ci_rest_client:
+    curl:
+      defaults:
+        CURLOPT_REFERER: "http://www.mojeskoly.cz"

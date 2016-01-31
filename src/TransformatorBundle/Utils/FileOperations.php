@@ -15,6 +15,9 @@ class FileOperations {
     const EMPTY_VALUE = "není";
     const MSMT_ENCODING = "windows-1250";
 
+    const MSMT_REDIZO = "openred2.csv";
+    const MSMT_ACTIVITY = "opensouc2.csv";
+
 	private $msmtUrl;
     private $user;
     private $userRepository;
@@ -88,6 +91,26 @@ class FileOperations {
             }
         }
 
+        $questionsCsv = $this->openCsv($this->tempDir . '/csi/OTAZKY_ciselnik.csv');
+        $questions = [];
+        $segments = [ 0 => "Základní informace" ]; // default fallback segment
+        $header = [ 0, 1, 2, 3, 4, 5, 6 ]; // activity id, activity name, segment id, segment name, question id, question text, type
+
+        foreach ($questionsCsv->fetch() as $row) {
+            $segmentId = $this->getCsvColumn($row, $header, 2);
+            $segmentName = $this->getCsvColumn($row, $header, 3);
+            $questionId = $this->getCsvColumn($row, $header, 4);
+
+            if (!array_key_exists($segmentId, $segments)) {
+                $segments[$segmentId] = $segmentName;
+            }
+
+            if (!array_key_exists($questionId, $questions)) {
+                $questions[$questionId] = $segmentId;
+            }
+        }
+
+
         $header = [ 0, 1, 2, 3, 4, 5 ]; // redizo, izo, form id, question id, question, answer
         $answers = $this->openCsv($this->tempDir . '/csi/ODPOVEDI_k_IZO.csv');
 
@@ -103,7 +126,7 @@ class FileOperations {
             if ($r !== $redizo) {
                 if ($redizo !== NULL) {
                     // remove the unneccessary IZO keys
-                    $school->units = array_values($school->units);
+                    $this->normalizeUnits($school);
 
                     // store school and log only if it exists - was included in Ministry of education data
                     if ($this->schoolRepository->findOneByCode($redizo))
@@ -140,17 +163,27 @@ class FileOperations {
             if (!array_key_exists($izo, $school->units)) {
                 $unit = new \stdClass();
                 $unit->IZO = $izo;
-                $unit->sections = [ new \stdClass() ]; // @todo different sections!
-                $unit->sections[0]->title = "Obecné informace";
-                $unit->sections[0]->information = [];
+                $unit->sections = [];
                 $school->units[$izo] = $unit;
+            }
+            $questionId = $this->getCsvColumn($row, $header, 3);
+            $segmentId = 0;
+            if (array_key_exists($questionId, $questions)) {
+                $segmentId = $questions[$questionId];
+            }
+            if (!array_key_exists($segmentId, $school->units[$izo]->sections)) {
+                $section =  new \stdClass();
+                $section->title = $segments[$segmentId];
+                $section->information = [];
+                $unit->sections[$segmentId] = $section;
             }
             $information = new \stdClass();
             $information->key = $this->getCsvColumn($row, $header, 4);
             $information->value = $this->getCsvColumn($row, $header, 5);
-            $school->units[$izo]->sections[0]->information[] = $information;
+            $school->units[$izo]->sections[$segmentId]->information[] = $information;
         }
-        $school->units = array_values($school->units);
+
+        $this->normalizeUnits($school);
 
         if ($this->schoolRepository->findOneByCode($school->{'RED-IZO'}))
             $this->logSchoolJson($school, $level);
@@ -158,11 +191,18 @@ class FileOperations {
         $this->em->flush();
     }
 
+    private function normalizeUnits($school) {
+        $school->units = array_values($school->units);
+        foreach ($school->units as $i => $unit) {
+            $school->units[$i]->sections = array_values($unit->sections);
+        }
+    }
+
 	public function processMSMT() {
         $destination = $this->tempDir;
         $filePath = $destination . "/msmt.zip";
 
-        //*/ download the zip file
+        /*/ download the zip file
 		$data = $this->getDataFromUrl($this->msmtUrl);
 
         // save it to temp dir
@@ -173,11 +213,26 @@ class FileOperations {
 
         // open the general file
         $this->processMsmtCsv();
+
+/*
+        $answers = $this->openCsv($this->tempDir . '/u.csv');
+
+        $header = range(0, 15); // redizo, izo, form id, question id, question, answer
+
+        $redizo = NULL;
+        $i = 0;
+        
+        // go through all answers
+        foreach ($answers->fetch() as $row) {
+            foreach ($header as $i) {
+                dump($this->getCsvColumn($row, $header, $i));
+            }
+        }*/
 	}
 
     private function processMsmtCsv() {
         $activities = $this->loadActivities();
-        $entities = $this->openCsv($this->tempDir . '/sitred2.csv', self::MSMT_ENCODING);
+        $entities = $this->openCsv($this->tempDir . '/' . self::MSMT_REDIZO, self::MSMT_ENCODING);
 
         $header = array_flip($entities->fetchOne(0));
         $levelRepository = $this->em->getRepository('AppBundle:Level');
@@ -351,7 +406,7 @@ class FileOperations {
     }
 
     private function loadActivities() {
-        $reader = $this->openCsv($this->tempDir . '/rejmisto.csv', self::MSMT_ENCODING);
+        $reader = $this->openCsv($this->tempDir . '/' . self::MSMT_ACTIVITY, self::MSMT_ENCODING);
 
         $i = 0;
         $header = array_flip($reader->fetchOne(0));
@@ -457,6 +512,7 @@ class FileOperations {
         }
 
         $reader->setDelimiter(';');
+
         return $reader;
     }
 
