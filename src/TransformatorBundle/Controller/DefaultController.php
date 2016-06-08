@@ -11,12 +11,18 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 class DefaultController extends Controller implements TokenAuthenticatedController
 {
 
+    private function setUnlimitedResources()
+    {
+        ini_set('max_execution_time', 60 * 60 * 10); // 10 hours :-P
+        ini_set('memory_limit', '1G');
+    }
+
     /**
      * @Route("/transformator/csi", name="csi")
      */
     public function csiAction(Request $request)
     {
-        ini_set('max_execution_time', 60 * 60 * 10); // 10 hours :-P
+        $this->setUnlimitedResources();
         $operations = $this->get('transformator.utils.file_operations');
 
         $operations->processCSI();
@@ -29,8 +35,7 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
      */
     public function msmtAction(Request $request)
     {
-        ini_set('max_execution_time', 60 * 60 * 10); // 10 hours :-P
-        ini_set('memory_limit', '1G');
+        $this->setUnlimitedResources();
         $operations = $this->get('transformator.utils.file_operations');
 
         $operations->processMSMT();
@@ -41,13 +46,24 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
     /**
      * @Route("/build/buildAll", name="build")
      */
-    public function buildAction(Request $request)
+    public function buildAllAction(Request $request)
     {
-        ini_set('max_execution_time', 60 * 60 * 10); // 10 hours :-P
-        ini_set('memory_limit', '1G');
+        $this->setUnlimitedResources();
         $build = $this->get('transformator.utils.build');
 
         $build->build();
+
+        return new Response("DONE");
+    }
+
+    /**
+     * @Route("/build/build/{limit}/{offset}", name="build")
+     */
+    public function buildAction($limit, $offset) {
+        $this->setUnlimitedResources();
+        $build = $this->get('transformator.utils.build');
+
+        $build->build($limit, $offset);
 
         return new Response("DONE");
     }
@@ -57,8 +73,7 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
      */
     public function pushToElasticAction(Request $request)
     {
-        ini_set('max_execution_time', 60 * 60 * 10); // 10 hours :-P
-        ini_set('memory_limit', '1G');
+        $this->setUnlimitedResources();
         $build = $this->get('transformator.utils.build');
 
         $build->pushToElastic();
@@ -68,15 +83,14 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
 
 
     /**
-     * @Route("/build/cacheSchoolLocation", name="cacheSchoolLocation")
+     * @Route("/build/cacheSchoolLocation/{limit}/{offset}", name="cacheSchoolLocation", defaults={"limit": NULL, "offset": NULL})
      */
-    public function cacheSchoolLocation(Request $request)
+    public function cacheSchoolLocation($limit, $offset)
     {
-        ini_set('max_execution_time', 60 * 60 * 10); // 10 hours :-P
-        ini_set('memory_limit', '1G');
+        $this->setUnlimitedResources();
         $build = $this->get('transformator.utils.build');
 
-        $build->cacheSchoolLocation();
+        $build->cacheSchoolLocation($limit, $offset);
 
         return new Response("DONE");
     }

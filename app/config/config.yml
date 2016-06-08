@@ -101,3 +101,4 @@ ci_rest_client:
     curl:
       defaults:
         CURLOPT_REFERER: "http://www.mojeskoly.cz"
+        CURLOPT_SSL_VERIFYPEER: false

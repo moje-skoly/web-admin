@@ -9,6 +9,9 @@ parameters:
     elastic.index: "nase-skoly"
     elastic.type: "school"
 
+    # Google Maps API
+    googleMaps.key: "AIzaSyB0_V71MYMxE-uatgqNMBqANs5ZT8uH2FI"
+
 services:
 #    service_name:
 #        class: AppBundle\Directory\ClassName
@@ -33,4 +36,4 @@ services:
 
     transformator.utils.build:
         class: TransformatorBundle\Utils\Build
-        arguments: ["@security.token_storage", "@ci.restclient", "@doctrine.orm.entity_manager", "%elastic.address%", "%elastic.index%", "%elastic.type%"]
+        arguments: ["@security.token_storage", "@ci.restclient", "@doctrine.orm.entity_manager", "%elastic.address%", "%elastic.index%", "%elastic.type%", "%googleMaps.key%"]

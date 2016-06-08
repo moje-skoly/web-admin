@@ -22,12 +22,15 @@ class Build {
     private $elastic;
     private $elasticIndex;
     private $elasticType;
+    private $googleMapsKey;
 
     private $currentSchool;
     private $reportEnabled = TRUE;
     private $locationLevel = NULL;
+    private $vars = [];
+    private $lastTime = 0;
 
-	public function __construct(TokenStorage $tokenStorage, $restClient, $entityManager, $elasticAddress, $elasticIndex, $elasticType) {
+	public function __construct(TokenStorage $tokenStorage, $restClient, $entityManager, $elasticAddress, $elasticIndex, $elasticType, $googleMapsKey) {
         mb_internal_encoding("UTF-8");
 
         $this->restClient = $restClient;
@@ -46,12 +49,13 @@ class Build {
         // configure elastic connection
         $this->elastic = ClientBuilder::create()
         ->setHosts([
-            "http://134.168.35.125:9200/"
+            "http://134.168.47.169:9200/"
         ])
         ->build();
 
         $this->elasticIndex = $elasticIndex;
         $this->elasticType = $elasticType;
+        $this->googleMapsKey = $googleMapsKey;
 	}
 
     /**
@@ -59,8 +63,19 @@ class Build {
      * - loop through the last versions of the school data from each data provider
      * - merge the results according to priority
      */
-    public function build() {
-        $schools = $this->em->createQuery("SELECT s FROM AppBundle:School s")->iterate();
+    public function build($limit = NULL, $offset = NULL) {
+        $query = $this->em->createQuery(
+            "SELECT s 
+            FROM AppBundle:School s
+            ORDER BY s.id"
+        );
+
+        if ($limit !== NULL) {
+            $query->setFirstResult($offset);
+            $query->setMaxResults($limit);
+        }
+
+        $schools = $query->iterate();
         $levels = $this->levelRepository->findBy([], [ 'priority' => 'DESC' ]);
         $levelIds = [];
         foreach ($levels as $level) {
@@ -96,6 +111,9 @@ class Build {
             }
 
             $isValid = $empty ? FALSE : $this->validateDocument($schoolJson);
+            if (!$isValid) {
+                dump($schoolJson);
+            }
 
             $school->setLastBuildJsonData(Json::encode($schoolJson));
             $school->setIsValid($isValid);
@@ -103,7 +121,7 @@ class Build {
                 $successful++;
             }
 
-            if ($total % 100 == 0) {
+            if ($total % 100 == 99) {
                 $this->em->flush();
                 $this->em->clear();
             }
@@ -117,96 +135,299 @@ class Build {
         dump("successful: $successful/$total");
     }
 
-    public function cacheSchoolLocation() {
+    /**
+     * Loop through all schools, find units or schools without location set and get the location
+     * from an external sources and cache it to database. At the moment we are using openstreetmap.org
+     * free API service.
+     */
+    public function cacheSchoolLocation($limit = NULL, $offset = NULL) {
 
         $total = 0;
         $successful = 0;
 
-        $schools = $this->em->createQuery(
+        $this->vars['google'] = 0;
+        $this->vars['nominatim1'] = 0;
+        $this->vars['nominatim2'] = 0;
+        $this->vars['none'] = 0;
+        $addressesNotEqual = 0;
+        $addressesEqual = 0;
+
+        $query = $this->em->createQuery(
             "SELECT s
             FROM AppBundle:School s
-            WHERE s.isValid = 0"
-        )->iterate();
+            WHERE s.isValid = 0
+            ORDER BY s.id"
+        );
+
+        if ($limit !== NULL) {
+            $query->setFirstResult($offset);
+            $query->setMaxResults($limit);
+        }
+
+        $schools = $query->iterate();
 
         foreach ($schools as $row) {
             $school = $row[0];
 
             $schoolJson = Json::decode($school->getLastBuildJsonData());
-            if (isset($schoolJson->metadata->address) && !isset($schoolJson->metadata->address->location)) {
-                $url = $this->createNominatimUrl($schoolJson->metadata->address);
-                //dump($url);
-                //continue;
-                $json = "";
-                try {
-                    $response = $this->restClient->get($url);
-                    $json = $response->getContent();
-                } catch (Ci\RestClientBundle\Exceptions\OperationTimedOutException $exception) {
-                    dump("Couldn't retrieve location information, server not responding.");
-                    continue;
-                }
+            dump($schoolJson);
 
-                try {
-                    $location = Json::decode($json);
-                } catch (JsonException $e) {
-                    dump($e->getMessage());
-                    dump($json);
-                    break;
-                }
-                if (is_array($location) && count($location) > 0) {
-                    if (isset($location[0]->lat) && isset($location[0]->lon)) {
-                        $this->logSchoolLocation($school, $location[0]->lat, $location[0]->lon);
-                        $successful++;$this->em->flush();
+            $newLocationFound = FALSE;
+            $someLocationMissing = FALSE;
+            $json = new \stdClass;
+            $schoolAddress = isset($schoolJson->metadata->address) ? $schoolJson->metadata->address : NULL;
+            $schoolLocation = isset($schoolAddress->location) ? $schoolAddress->location : NULL;
+            if ($schoolAddress) {
+                if (!$schoolLocation) {
+                    $someLocationMissing = TRUE;
+                    $schoolLocation = $this->retrieveLocation($schoolAddress);
+                    if ($schoolLocation) {
+                        $newLocationFound = TRUE;
                     }
                 }
 
-                if (($total + 1) % 100 == 0) {
-                    $this->em->flush();
+                if ($schoolLocation) {
+                    $json = $this->createUnitWithLocation($schoolLocation->lat, $schoolLocation->lon);
                 }
-
-                usleep(600000); // sleep for one second
             }
 
-            $total++;
+            if (isset($schoolJson->units)) {
+                foreach ($schoolJson->units as $unit) {
+                    if (!isset($unit->metadata->address)) {
+                        continue;
+                    }
+                    $address = $unit->metadata->address;
+                    if ($address) {
+                        $location = NULL;
+                        if (!isset($address->location)) {
+                            $someLocationMissing = TRUE;
+                            if ($schoolAddress && $this->areAddressesEqual($schoolAddress, $address)) {
+                                $location = $schoolLocation;
+                                $addressesEqual++;
+                                dump("equal");
+                            } else {
+                                $addressesNotEqual++;
+                                $location = $this->retrieveLocation($address);
+                                dump("not equal");
+                                if ($schoolLocation) {
+                                    $location = $schoolLocation;
+                                    dump("location found");
+                                } else {
+                                    dump("location not found");
+                                }
+                            }
+                        } else {
+                            $location = $address->location;
+                        }
+
+                        if ($location) {
+                            if (!isset($json->units)) {
+                                $json->units = [];
+                            }
+                            $newUnit = $this->createUnitWithLocation($location->lat, $location->lon);
+                            $newUnit->IZO = $unit->IZO;
+                            $json->units[] = $newUnit;
+                            $newLocationFound = TRUE;
+                        }
+                    }
+                }
+            }
+
+            if ($newLocationFound) {
+                dump($json);
+                if ($this->logSchoolLocation($json, $school)) {
+                    $successful++;
+                }
+            }
+
+            if ($someLocationMissing) {
+                $total++;
+            }
+
+
+            // store to db every 100th loop
+            if (($total) % 100 == 0) {
+                $this->em->flush();
+            }
         }
 
         $this->em->flush();
 
         dump("successful: $successful/$total");
+        dump("addresses equal/not equal: $addressesEqual/$addressesNotEqual");
+        dump($this->vars);
     }
 
-    public function createNominatimUrl($address) {
-        $url = 'http://nominatim.openstreetmap.org/search?format=json&countrycodes=CZ';
-        if (!empty($address->street)) {
-            $url .= "&street=" . urlencode($address->street);
+    private function createUnitWithLocation($lat, $lon) {
+        $unit = new \stdClass;
+        $unit->metadata = new \stdClass;
+        $unit->metadata->address = new \stdClass;
+        $unit->metadata->address->location = new \stdClass;
+        $unit->metadata->address->location->lat = $lat;
+        $unit->metadata->address->location->lon = $lon;
+        return $unit;
+    }
+
+    public function retrieveLocation($address) {
+        $location = $this->retrieveNominatimLocation($address);
+        if ($location) {
+            $this->vars['nominatim1']++;
         } else {
-            $url .= "&city=" . urlencode($address->city);
+            $location = $this->retrieveNominatimLocation($address, TRUE);
+            
+            if ($location) {
+                $this->vars['nominatim2']++;
+            } else {
+                $location = $this->retrieveGoogleMapsLocation($address);
+                
+                if ($location) {
+                    $this->vars['google']++;
+                } else {
+                    dump("Address not found:");
+                    dump($address);
+                    $this->vars['none']++;
+                }
+            }
         }
 
-        $url .= "&postalcode=" . urlencode($address->postalCode);
+        return $location;
+    }
+
+    /**
+     * Retrieve the precise location of given address from openstreetmap.org
+     * @param object Address object
+     * @return object Location object
+     */
+    public function retrieveNominatimLocation($address, $omitCity = FALSE) {
+        $url = $this->createNominatimUrl($address, $omitCity);
+
+        $json = "";
+        try {
+            // sleep to prevent overrunning the one request-per-second limit
+            $time = microtime(TRUE);
+            if ($time - $this->lastTime < 1.0) {
+                $time = 1.0 - ($time - $this->lastTime);
+                usleep(intval($time * 1000000));
+            }
+            $this->lastTime = $time;
+            $response = $this->restClient->get($url);
+            $json = $response->getContent();
+        } catch (Ci\RestClientBundle\Exceptions\OperationTimedOutException $exception) {
+            dump("Couldn't retrieve location information at openstreetmap.org, server not responding.");
+            continue;
+        }
+
+        $location = NULL;
+        try {
+            $location = Json::decode($json);
+            if (empty($location) || !isset($location[0]->lat) || !isset($location[0]->lon)) {
+                $location = NULL;
+            } else {
+                $location = $location[0];
+            }
+        } catch (JsonException $e) {
+            dump($e->getMessage());
+            dump($json);
+        }
+
+        return $location;
+    }
+
+    /**
+     * Retrieve the precise location of given address from Google Maps API
+     * @param object Address object
+     * @return object Location object
+     */
+    public function retrieveGoogleMapsLocation($address) {
+        $url = $this->createGoogleMapsUrl($address);
+
+        $json = "";
+        try {
+            $response = $this->restClient->get($url);
+            $json = $response->getContent();
+        } catch (Ci\RestClientBundle\Exceptions\OperationTimedOutException $exception) {
+            dump("Couldn't retrieve location information at Google Maps, server not responding.");
+            continue;
+        }
+
+        $location = NULL;
+        try {
+            $location = Json::decode($json);
+            if (!empty($location) && $location->status == "OK") {
+                $location = $location->results[0]->geometry->location;
+                $location->lon = $location->lng;
+            } else {
+                dump($address);
+                if ($location) {
+                    dump("status: " . $location->status);
+                }
+                $location = NULL;
+            }
+        } catch (JsonException $e) {
+            dump($e->getMessage());
+            dump($json);
+        }
+
+        return $location;
+    }
+
+
+    /**
+     * Create the URL address for the Nominatim API from the given address.
+     * @param  object Address object
+     * @return string
+     */
+    public function createNominatimUrl($address, $omitCity = FALSE) {
+        $url = 'http://nominatim.openstreetmap.org/search?format=json&countrycodes=CZ&q=';
+        $url .= $this->getAddressQuery($address, $omitCity);
         return $url;
     }
 
-    public function logSchoolLocation($school, $lat, $lon) {
-        $json = new \stdClass;
-        $json->metadata = new \stdClass;
-        $json->metadata->address = new \stdClass;
-        $json->metadata->address->location = new \stdClass;
-        $json->metadata->address->location->lat = $lat;
-        $json->metadata->address->location->lon = $lon;
+    /**
+     * Create the URL address for the Google Maps API from the given address.
+     * @param  object Address object
+     * @return string
+     */
+    public function createGoogleMapsUrl($address) {
+        $url = 'https://maps.googleapis.com/maps/api/geocode/json?address=';
+        $url .= $this->getAddressQuery($address);
+        $url .= '&key=' . $this->googleMapsKey;
+        return $url;
+    }
 
+    private function getAddressQuery($address, $omitCity = FALSE) {
+        $components = [];
+        if (!empty($address->street)) {
+            $components[] = $address->street;
+        }
+        if (!empty($address->city) && !$omitCity) {
+            $components[] = $address->city;
+        }
+        if (!empty($address->postalCode)) {
+            $components[] = $address->postalCode;
+        }
+        return urlencode(implode(', ', $components) . ", Czech Republic");
+    }
+
+    /**
+     * Log the location json to DB
+     * @param  array School
+     * @return boolean Was stored successfully
+     */
+    public function logSchoolLocation($json, $school) {
         $data = NULL;
         try {
             $data = Json::encode($json);
         } catch (JsonException $e) {
-            dump("2");
             dump($json);
             dump($e->getMessage());
-            return;
+            return FALSE;
         }
 
         if ($this->locationLevel === NULL) {
-            $level = $this->levelRepository->findOneByName('Auto:location');
+            $this->locationLevel = $this->levelRepository->findOneByName('Auto:location');
         }
+        $level = $this->locationLevel;
 
         $log = new Entity\Log();
         $log->setLevel($level);
@@ -216,6 +437,8 @@ class Build {
         $log->setJsonData($data);
 
         $this->em->persist($log);
+
+        return TRUE;
     }
 
     public function pushToElastic() {
@@ -258,7 +481,7 @@ class Build {
         }
 
         $deleted = 0;
-        foreach ($documents as $redizo => $document) {
+        foreach ($documents as $redizo => $id) {
             $params = [
                 'index' => $this->elasticIndex,
                 'type' => $this->elasticType
@@ -425,7 +648,9 @@ class Build {
                     $this->removeRedundant($unit, ["IZO", "unitType", "metadata", "sections"]);
                 }
 
-                $this->validateUnitMetadata($unit->metadata);
+                if (!$this->validateUnitMetadata($unit->metadata)) {
+                    return FALSE;
+                }
 
                 if (isset($unit->sections)) {
                     foreach ($unit->sections as $key => $section) {
@@ -479,11 +704,21 @@ class Build {
         $this->removeRedundant($metadata, ["name", "ICO", "contact", "address"]);
 
         // validate address
-        if (isset($metadata->address) && is_object($metadata->address)) {
-            $this->removeRedundant($metadata->address, ["street", "city", "postalCode", "ruianCode"]);
+        //if (isset($metadata->address) && is_object($metadata->address)) {
+        //    $this->removeRedundant($metadata->address, ["street", "city", "postalCode", "ruianCode"]);
+        //}
+        if (isset($metadata->address)) {
+            $address = $metadata->address;
+            if (!isset($address->street) || !isset($address->city) || !isset($address->postalCode) ||
+                !isset($address->location) || !is_object($address->location)) {
+                $this->report("Invalid address of a unit, missing street, city, postalCode or location.");
+                return FALSE;
+            }
         }
 
         $this->validateContact($metadata);
+
+        return TRUE;
     }
 
 
@@ -521,5 +756,11 @@ class Build {
         if ($this->reportEnabled) {
             dump("School $this->currentSchool invalid: $message");
         }
+    }
+
+    private function areAddressesEqual($first, $second) {
+        return $first->street == $second->street &&
+            $first->city == $second->city &&
+            $first->postalCode == $second->postalCode;
     }
 }
