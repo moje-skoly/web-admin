@@ -3,7 +3,7 @@
 use Symfony\Component\ClassLoader\ApcClassLoader;
 use Symfony\Component\HttpFoundation\Request;
 
-$appDir = __DIR__ . '/../../../home/app';
+$appDir = __DIR__ . '/../app';
 
 $loader = require_once $appDir . '/bootstrap.php.cache';
 
