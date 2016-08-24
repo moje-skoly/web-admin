@@ -20,13 +20,23 @@ $apcLoader->register(true);
 require_once $appDir . '/AppKernel.php';
 //require_once __DIR__.'/../app/AppCache.php';
 
-$kernel = new AppKernel('prod', false);
+$request = Request::createFromGlobals();
+$env = 'prod';
+$remoteIp = $request->getClientIp();
+$adminIps = [
+    '109.81.209.64',
+    '94.112.251.18',
+];
+if (in_array($remoteIp, $adminIps)) {
+    $env = 'dev';
+}
+$kernel = new AppKernel($env, false);
 $kernel->loadClassCache();
 //$kernel = new AppCache($kernel);
 
 // When using the HttpCache, you need to call the method in your front controller instead of relying on the configuration parameter
 //Request::enableHttpMethodParameterOverride();
-$request = Request::createFromGlobals();
+
 $response = $kernel->handle($request);
 $response->send();
 $kernel->terminate($request, $response);
