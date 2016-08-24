@@ -44,7 +44,7 @@ class FileOperations {
         $this->em = $entityManager;
 
         $this->msmtUrl = $msmtUrl;
-        $this->tempDir = __DIR__ . "/../../../app/temp";
+        $this->tempDir = __DIR__ . "/../../../../data-sources";
 
         stream_filter_register(FilterTranscode::FILTER_NAME."*", "\TransformatorBundle\Utils\FilterTranscode");
 
