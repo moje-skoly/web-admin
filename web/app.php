@@ -1,6 +1,7 @@
 <?php
 
 use Symfony\Component\ClassLoader\ApcClassLoader;
+use Symfony\Component\Debug\Debug;
 use Symfony\Component\HttpFoundation\Request;
 
 $appDir = __DIR__ . '/../app';
@@ -29,6 +30,7 @@ $adminIps = [
 ];
 if (in_array($remoteIp, $adminIps)) {
     $env = 'dev';
+    Debug::enable();
 }
 $kernel = new AppKernel($env, false);
 $kernel->loadClassCache();
