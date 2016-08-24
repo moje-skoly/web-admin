@@ -28,11 +28,13 @@ $adminIps = [
     '109.81.209.64',
     '94.112.251.18',
 ];
+$debug = false;
 if (in_array($remoteIp, $adminIps)) {
     $env = 'dev';
+    $debug = true;
     Debug::enable();
 }
-$kernel = new AppKernel($env, false);
+$kernel = new AppKernel($env, $debug);
 $kernel->loadClassCache();
 //$kernel = new AppCache($kernel);
 
