@@ -44,7 +44,7 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
     }
 
     /**
-     * @Route("/build/buildAll", name="build")
+     * @Route("/build/buildAll", name="buildAll")
      */
     public function buildAllAction(Request $request)
     {

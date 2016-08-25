@@ -170,7 +170,6 @@ class Build {
             $school = $row[0];
 
             $schoolJson = Json::decode($school->getLastBuildJsonData());
-            dump($schoolJson);
 
             $newLocationFound = FALSE;
             $someLocationMissing = FALSE;

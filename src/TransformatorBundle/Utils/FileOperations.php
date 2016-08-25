@@ -50,6 +50,7 @@ class FileOperations {
 
         $this->userId = $tokenStorage->getToken()->getUser()->getId();
         $this->userRepository = $this->em->getRepository('AppBundle:User');
+        $this->user = $this->userRepository->find($this->userId);
         $this->schoolRepository = $this->em->getRepository('AppBundle:School');
 	}
 
@@ -287,6 +288,7 @@ class FileOperations {
 
             if (isset($json->metadata->name))
                 $school->setName($json->metadata->name);
+            $school->setIsValid(FALSE);
             $this->em->persist($school);
         }
 
