@@ -5,8 +5,8 @@ parameters:
     data.msmt: "http://stistko.uiv.cz/rejstrik/rejstrik_151103.zip"
 
     # elastic credentials
-    elastic.address: "http://134.168.35.125:9200/"
-    elastic.index: "nase-skoly"
+    elastic.address: "http://127.0.0.1:9200/"
+    elastic.index: "mojeskoly"
     elastic.type: "school"
 
     # Google Maps API
