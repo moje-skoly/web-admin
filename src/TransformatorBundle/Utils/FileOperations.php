@@ -2,9 +2,10 @@
 
 namespace TransformatorBundle\Utils;
 
+use Doctrine\ORM\EntityManager;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
-use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
+//use Symfony\Component\Filesystem\Filesystem;
+//use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 
 use League\Csv\Reader;
 use AppBundle\Entity;
@@ -18,10 +19,18 @@ class FileOperations {
     const MSMT_REDIZO = "openred2.csv";
     const MSMT_ACTIVITY = "opensouc2.csv";
 
-	private $msmtUrl;
+    /** @var EntityManager */
+	private $em;
+
+    private $msmtUrl;
     private $user;
+
+    /** @var \Doctrine\ORM\EntityRepository */
     private $userRepository;
+
+    /** @var \Doctrine\ORM\EntityRepository */
     private $schoolRepository;
+
     private $types = [
         'Mateřská škola' => 'materska_skola',
         'Základní škola' => 'zakladni_skola',
@@ -119,6 +128,8 @@ class FileOperations {
         $level = $levelRepository->findOneByName('ČŠI');
 
         $redizo = NULL;
+        $school = NULL;
+        $unit = NULL;
         $i = 0;
         
         // go through all answers

@@ -2,24 +2,31 @@
 
 namespace TransformatorBundle\Utils;
 
-use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
-use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
-
+use AppBundle\Entity;
+use Ci\RestClientBundle\Exceptions\OperationTimedOutException;
+use Ci\RestClientBundle\Services\RestClient;
+use Doctrine\ORM\EntityManager;
+use Elasticsearch\ClientBuilder;
 use Nette\Utils\Json;
 use Nette\Utils\JsonException;
-use Elasticsearch\ClientBuilder;
-
-use AppBundle\Entity;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
 
 class Build {
 
+    /** @var RestClient */
     private $restClient;
 
-	private $msmtUrl;
+    /** @var EntityManager */
+    private $em;
+
     private $user;
+
+    /** @var \Doctrine\ORM\EntityRepository */
     private $schoolRepository;
+
+    /** @var \Elasticsearch\Client */
     private $elastic;
+
     private $elasticIndex;
     private $elasticType;
     private $googleMapsKey;
@@ -48,9 +55,7 @@ class Build {
 
         // configure elastic connection
         $this->elastic = ClientBuilder::create()
-        ->setHosts([
-            "http://134.168.47.169:9200/"
-        ])
+        ->setHosts([ $elasticAddress ])
         ->build();
 
         $this->elasticIndex = $elasticIndex;
@@ -267,6 +272,11 @@ class Build {
         return $unit;
     }
 
+    /**
+     * Retrieve GPS location from different services.
+     * @param $address object Address object
+     * @return object
+     */
     public function retrieveLocation($address) {
         $location = $this->retrieveNominatimLocation($address);
         if ($location) {
@@ -294,7 +304,8 @@ class Build {
 
     /**
      * Retrieve the precise location of given address from openstreetmap.org
-     * @param object Address object
+     * @param $address object Address object
+     * @param $omitCity bool Omit city in the url
      * @return object Location object
      */
     public function retrieveNominatimLocation($address, $omitCity = FALSE) {
@@ -311,9 +322,9 @@ class Build {
             $this->lastTime = $time;
             $response = $this->restClient->get($url);
             $json = $response->getContent();
-        } catch (Ci\RestClientBundle\Exceptions\OperationTimedOutException $exception) {
+        } catch (OperationTimedOutException $exception) {
             dump("Couldn't retrieve location information at openstreetmap.org, server not responding.");
-            continue;
+            return NULL;
         }
 
         $location = NULL;
@@ -334,7 +345,7 @@ class Build {
 
     /**
      * Retrieve the precise location of given address from Google Maps API
-     * @param object Address object
+     * @param $address object Address object
      * @return object Location object
      */
     public function retrieveGoogleMapsLocation($address) {
@@ -344,9 +355,9 @@ class Build {
         try {
             $response = $this->restClient->get($url);
             $json = $response->getContent();
-        } catch (Ci\RestClientBundle\Exceptions\OperationTimedOutException $exception) {
+        } catch (OperationTimedOutException $exception) {
             dump("Couldn't retrieve location information at Google Maps, server not responding.");
-            continue;
+            return NULL;
         }
 
         $location = NULL;
@@ -373,7 +384,8 @@ class Build {
 
     /**
      * Create the URL address for the Nominatim API from the given address.
-     * @param  object Address object
+     * @param $address object Address object
+     * @param $omitCity bool Omit city in the URL
      * @return string
      */
     public function createNominatimUrl($address, $omitCity = FALSE) {
@@ -384,7 +396,7 @@ class Build {
 
     /**
      * Create the URL address for the Google Maps API from the given address.
-     * @param  object Address object
+     * @param $address object Address object
      * @return string
      */
     public function createGoogleMapsUrl($address) {
@@ -410,7 +422,8 @@ class Build {
 
     /**
      * Log the location json to DB
-     * @param  array School
+     * @param $json object
+     * @param $school array
      * @return boolean Was stored successfully
      */
     public function logSchoolLocation($json, $school) {
@@ -479,14 +492,13 @@ class Build {
             $total++;
         }
 
-        $deleted = 0;
         foreach ($documents as $redizo => $id) {
             $params = [
                 'index' => $this->elasticIndex,
                 'type' => $this->elasticType
             ];
             $params['id'] = $id;
-            $response = $this->elastic->delete($params);
+            $this->elastic->delete($params);
             $deleted++;
         }
 
@@ -548,8 +560,8 @@ class Build {
 
     /**
      * Merge two objects recursively with respect to the school schema.
-     * @param object original
-     * @param object new
+     * @param $original object
+     * @param $new object
      * @return object
      */
     public function mergeObjects($original, $new) {
@@ -572,6 +584,10 @@ class Build {
 
     /**
      * Merge two arrays according to the given key.
+     * @param $original array
+     * @param $new array
+     * @param $key string
+     * @return array
      */
     public function mergeArrays($original, $new, $key) {
         switch ($key) {
@@ -588,13 +604,13 @@ class Build {
 
     /**
      * Merge two arrays that has an identical field value.
-     * @param object original
-     * @param object new
-     * @param string field
-     * @return object
+     * @param $original array
+     * @param $new array
+     * @param $field string
+     * @param $override bool
+     * @return array
      */
     public function mergeArraysByField($original, $new, $field, $override = FALSE) {
-        $found = FALSE;
         foreach ($new as $key => $value) {
             $found = FALSE;
             foreach ($original as $k => $v) {
@@ -652,9 +668,9 @@ class Build {
                 }
 
                 if (isset($unit->sections)) {
-                    foreach ($unit->sections as $key => $section) {
+                    foreach ($unit->sections as $key2 => $section) {
                         if (!isset($section->title) || !isset($section->information)) {
-                            unset($unit->sections[$key]);
+                            unset($unit->sections[$key2]);
                             continue;
                         }
 
