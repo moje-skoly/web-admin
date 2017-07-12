@@ -18,7 +18,7 @@ class Log {
 
     /**
      * @ORM\ManyToOne(targetEntity="School", inversedBy="log")
-     * @ORM\JoinColumn(name="school_id", referencedColumnName="id")
+     * @ORM\JoinColumn(name="school_code", referencedColumnName="code")
      */
     protected $school;
 
