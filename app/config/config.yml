@@ -8,12 +8,6 @@ imports:
 parameters:
     locale: cs
 
-graviton_vcap:
-    services:
-        naseskoly-admin-db:
-            type: cleardb
-            name: naseskoly-admin-db
-
 framework:
     #esi:             ~
     translator:      { fallbacks: ["%locale%"] }

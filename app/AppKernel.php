@@ -13,7 +13,6 @@ class AppKernel extends Kernel
     public function registerBundles()
     {
         $bundles = array(
-            new Graviton\VcapBundle\GravitonVcapBundle(),
             new Symfony\Bundle\FrameworkBundle\FrameworkBundle(),
             new Symfony\Bundle\SecurityBundle\SecurityBundle(),
             new Symfony\Bundle\TwigBundle\TwigBundle(),
