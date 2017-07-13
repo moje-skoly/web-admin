@@ -5,7 +5,7 @@ parameters:
     data.msmt: "http://stistko.uiv.cz/rejstrik/rejstrik_151103.zip"
 
     # elastic credentials
-    elastic.address: "http://127.0.0.1:9200/"
+    elastic.address: "http://127.0.0.1:9200"
     elastic.index: "mojeskoly"
     elastic.type: "school"
 
@@ -36,4 +36,4 @@ services:
 
     transformator.utils.build:
         class: TransformatorBundle\Utils\Build
-        arguments: ["@security.token_storage", "@ci.restclient", "@doctrine.orm.entity_manager", "%elastic.address%", "%elastic.index%", "%elastic.type%", "%googleMaps.key%"]
+        arguments: ["@security.token_storage", "@ci.restclient", "@doctrine.orm.entity_manager", "@session", "%elastic.address%", "%elastic.index%", "%elastic.type%", "%googleMaps.key%"]

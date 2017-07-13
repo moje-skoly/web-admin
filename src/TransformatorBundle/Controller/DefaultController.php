@@ -17,6 +17,12 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
         ini_set('memory_limit', '1G');
     }
 
+    private function completed()
+    {
+        //return new Response("DONE");
+        return $this->redirectToRoute('scripts');
+    }
+
     /**
      * @Route("/transformator/csi", name="csi")
      */
@@ -27,7 +33,7 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
 
         $operations->processCSI();
 
-        return new Response("DONE");
+        return $this->completed();
     }
 
     /**
@@ -40,7 +46,7 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
 
         $operations->processMSMT();
 
-        return new Response("DONE");
+        return $this->completed();
     }
 
     /**
@@ -53,7 +59,7 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
 
         $build->build();
 
-        return new Response("DONE");
+        return $this->completed();
     }
 
     /**
@@ -65,7 +71,7 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
 
         $build->build($limit, $offset);
 
-        return new Response("DONE");
+        return $this->completed();
     }
 
     /**
@@ -78,7 +84,7 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
 
         $build->pushToElastic();
 
-        return new Response("DONE");
+        return $this->completed();
     }
 
 
@@ -92,6 +98,6 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
 
         $build->cacheSchoolLocation($limit, $offset);
 
-        return new Response("DONE");
+        return $this->completed();
     }
 }

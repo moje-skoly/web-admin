@@ -7,8 +7,10 @@ use Ci\RestClientBundle\Exceptions\OperationTimedOutException;
 use Ci\RestClientBundle\Services\RestClient;
 use Doctrine\ORM\EntityManager;
 use Elasticsearch\ClientBuilder;
+use Elasticsearch\Common\Exceptions\NoNodesAvailableException;
 use Nette\Utils\Json;
 use Nette\Utils\JsonException;
+use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
 
 class Build {
@@ -27,6 +29,9 @@ class Build {
     /** @var \Elasticsearch\Client */
     private $elastic;
 
+    /** @var Session */
+    private $session;
+
     private $elasticIndex;
     private $elasticType;
     private $googleMapsKey;
@@ -37,7 +42,7 @@ class Build {
     private $vars = [];
     private $lastTime = 0;
 
-	public function __construct(TokenStorage $tokenStorage, $restClient, $entityManager, $elasticAddress, $elasticIndex, $elasticType, $googleMapsKey) {
+	public function __construct(TokenStorage $tokenStorage, $restClient, $entityManager, $session, $elasticAddress, $elasticIndex, $elasticType, $googleMapsKey) {
         mb_internal_encoding("UTF-8");
 
         $this->restClient = $restClient;
@@ -47,12 +52,14 @@ class Build {
             return;
 
         $this->em = $entityManager;
+        $this->session = $session;
 
         $this->user = $this->em->getRepository('AppBundle:User')->find($tokenStorage->getToken()->getUser()->getId());
         $this->schoolRepository = $this->em->getRepository('AppBundle:School');
         $this->levelRepository = $this->em->getRepository('AppBundle:Level');
         $this->logRepository = $this->em->getRepository('AppBundle:Log');
 
+        dump($elasticAddress);
         // configure elastic connection
         $this->elastic = ClientBuilder::create()
         ->setHosts([ $elasticAddress ])
@@ -62,6 +69,22 @@ class Build {
         $this->elasticType = $elasticType;
         $this->googleMapsKey = $googleMapsKey;
 	}
+
+	private function toDumpString($message) {
+	    if (is_scalar($message)) {
+	        return $message;
+        } else {
+            return print_r($message, TRUE);
+        }
+    }
+
+	private function dump($message) {
+	    $this->session->getFlashBag()->add("info", $this->toDumpString($message));
+    }
+
+    private function error($message) {
+        $this->session->getFlashBag()->add("danger", $this->toDumpString($message));
+    }
 
     /**
      * Do the build - loop through all the schools:
@@ -117,7 +140,7 @@ class Build {
 
             $isValid = $empty ? FALSE : $this->validateDocument($schoolJson);
             if (!$isValid) {
-                dump($schoolJson);
+                $this->error($schoolJson);
             }
 
             $school->setLastBuildJsonData(Json::encode($schoolJson));
@@ -131,13 +154,13 @@ class Build {
                 $this->em->clear();
             }
 
-            // dump(Json::encode($schoolJson, Json::PRETTY));
+            // $this->dump(Json::encode($schoolJson, Json::PRETTY));
 
             $total++;
         }
         $this->em->flush();
 
-        dump("successful: $successful/$total");
+        $this->dump("successful: $successful/$total");
     }
 
     /**
@@ -208,16 +231,16 @@ class Build {
                             if ($schoolAddress && $this->areAddressesEqual($schoolAddress, $address)) {
                                 $location = $schoolLocation;
                                 $addressesEqual++;
-                                dump("equal");
+                                $this->dump("equal");
                             } else {
                                 $addressesNotEqual++;
                                 $location = $this->retrieveLocation($address);
-                                dump("not equal");
+                                $this->dump("not equal");
                                 if ($schoolLocation) {
                                     $location = $schoolLocation;
-                                    dump("location found");
+                                    $this->dump("location found");
                                 } else {
-                                    dump("location not found");
+                                    $this->dump("location not found");
                                 }
                             }
                         } else {
@@ -238,7 +261,7 @@ class Build {
             }
 
             if ($newLocationFound) {
-                dump($json);
+                $this->dump($json);
                 if ($this->logSchoolLocation($json, $school)) {
                     $successful++;
                 }
@@ -257,9 +280,9 @@ class Build {
 
         $this->em->flush();
 
-        dump("successful: $successful/$total");
-        dump("addresses equal/not equal: $addressesEqual/$addressesNotEqual");
-        dump($this->vars);
+        $this->dump("successful: $successful/$total");
+        $this->dump("addresses equal/not equal: $addressesEqual/$addressesNotEqual");
+        $this->dump($this->vars);
     }
 
     private function createUnitWithLocation($lat, $lon) {
@@ -292,8 +315,8 @@ class Build {
                 if ($location) {
                     $this->vars['google']++;
                 } else {
-                    dump("Address not found:");
-                    dump($address);
+                    $this->error("Address not found:");
+                    $this->error($address);
                     $this->vars['none']++;
                 }
             }
@@ -323,7 +346,7 @@ class Build {
             $response = $this->restClient->get($url);
             $json = $response->getContent();
         } catch (OperationTimedOutException $exception) {
-            dump("Couldn't retrieve location information at openstreetmap.org, server not responding.");
+            $this->error("Couldn't retrieve location information at openstreetmap.org, server not responding.");
             return NULL;
         }
 
@@ -336,8 +359,8 @@ class Build {
                 $location = $location[0];
             }
         } catch (JsonException $e) {
-            dump($e->getMessage());
-            dump($json);
+            $this->error($e->getMessage());
+            $this->error($json);
         }
 
         return $location;
@@ -356,7 +379,7 @@ class Build {
             $response = $this->restClient->get($url);
             $json = $response->getContent();
         } catch (OperationTimedOutException $exception) {
-            dump("Couldn't retrieve location information at Google Maps, server not responding.");
+            $this->error("Couldn't retrieve location information at Google Maps, server not responding.");
             return NULL;
         }
 
@@ -367,15 +390,15 @@ class Build {
                 $location = $location->results[0]->geometry->location;
                 $location->lon = $location->lng;
             } else {
-                dump($address);
+                $this->error($address);
                 if ($location) {
-                    dump("status: " . $location->status);
+                    $this->error("status: " . $location->status);
                 }
                 $location = NULL;
             }
         } catch (JsonException $e) {
-            dump($e->getMessage());
-            dump($json);
+            $this->error($e->getMessage());
+            $this->error($json);
         }
 
         return $location;
@@ -431,8 +454,8 @@ class Build {
         try {
             $data = Json::encode($json);
         } catch (JsonException $e) {
-            dump($json);
-            dump($e->getMessage());
+            $this->error($json);
+            $this->error($e->getMessage());
             return FALSE;
         }
 
@@ -454,7 +477,12 @@ class Build {
     }
 
     public function pushToElastic() {
-        $documents = $this->retrieveExistingDocuments();
+        try {
+            $documents = $this->retrieveExistingDocuments();
+        } catch (NoNodesAvailableException $e) {
+            $this->error("Elastic server not responding: " . $e->getMessage());
+            return;
+        }
         $schools = $this->em->createQuery(
             "SELECT s
             FROM AppBundle:School s
@@ -502,24 +530,23 @@ class Build {
             $deleted++;
         }
 
-        dump("successful: $successful/$total");
-        dump("updated: $updated");
-        dump("inserted: $inserted");
-        dump("deleted: $deleted");
+        $this->dump("successful: $successful/$total");
+        $this->dump("updated: $updated");
+        $this->dump("inserted: $inserted");
+        $this->dump("deleted: $deleted");
     }
 
     public function retrieveExistingDocuments() {
         $documents = [];
 
         $params = [
-            "search_type" => "scan",    // use search_type=scan
             "scroll" => "10s",          // how long between scroll requests. should be small!
             "size" => 100,               // how many results *per shard* you want back
             "index" => $this->elasticIndex,
             "type" => $this->elasticType,
             "body" => [
                 "query" => [
-                    "match_all" => []
+                    "match_all" => new \stdClass()
                 ]
             ]
         ];
@@ -769,7 +796,7 @@ class Build {
 
     public function report($message) {
         if ($this->reportEnabled) {
-            dump("School $this->currentSchool invalid: $message");
+            $this->error("School $this->currentSchool invalid: $message");
         }
     }
 

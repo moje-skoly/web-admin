@@ -44,7 +44,9 @@
 							<li{% if app.request.attributes.get('_route') == "homepage" %} class="active"{% endif %}><a href="{{ path('homepage') }}">Přehledy</a></li>
 
 							<li{% if app.request.attributes.get('_route') == "users" %} class="active"{% endif %}><a href="{{ path('users') }}">Uživatelé</a></li>
-						{% endif %}
+
+							<li{% if app.request.attributes.get('_route') == "scripts" %} class="active"{% endif %}><a href="{{ path('scripts') }}">Skripty</a></li>
+                        {% endif %}
 
 						<li{% if app.request.attributes.get('_route') == "about" %} class="active"{% endif %}><a href="{{ path('about') }}">O projektu</a></li>
 

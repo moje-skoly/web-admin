@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+
+{% block content %}
+    <div id="wrapper">
+        <div id="container">
+            <div id="welcome">
+                <h1>Skripty</h1>
+            </div>
+
+            <div class="row">
+                <div class="col-xs-12">
+                    Spouštějte skripty, pouze pokud víte, co děláte!
+                </div>
+            </div>
+
+            {% set actions = {
+                pushToElastic: "Push to Elastic"
+            } %}
+
+            <div class="row">
+                <div class="col-xs-12">
+                    <p>
+                        {% for action, title in actions %}
+                            <a class="btn btn-large btn-primary" data-toggle="confirmation"
+                               href="{{ path(action, { token: 'ece59a72-9637-4205-80de-fb2b5d39a275' }) }}"
+                            >{{ title }}</a>
+                        {% endfor %}
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+<script src="/js/bootstrap-confirmation.min.js"></script>
+<script>
+$(function() {
+    $('[data-toggle=confirmation]').confirmation({
+        rootSelector: '[data-toggle=confirmation]',
+        title: "Jste si jistí?",
+        btnOkIcon: false,
+        btnOkLabel: "Ano",
+        btnCancelIcon: false,
+        btnCancelLabel: "Ne",
+        popout: true
+    });
+});
+</script>
+
+{% endblock %}

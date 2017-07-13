@@ -37,4 +37,12 @@ class DefaultController extends Controller
     {
         return $this->render('default/about.html.twig');
     }
+
+    /**
+     * @Route("/skripty", name="scripts")
+     */
+    public function scriptsAction(Request $request)
+    {
+        return $this->render('default/scripts.html.twig');
+    }
 }
