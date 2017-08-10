@@ -17,19 +17,19 @@ class Log {
     protected $id;
 
     /**
-     * @ORM\ManyToOne(targetEntity="School", inversedBy="log")
+     * @ORM\ManyToOne(targetEntity="School")
      * @ORM\JoinColumn(name="school_code", referencedColumnName="code")
      */
     protected $school;
 
     /**
-     * @ORM\ManyToOne(targetEntity="Level", inversedBy="log")
+     * @ORM\ManyToOne(targetEntity="Level")
      * @ORM\JoinColumn(name="level_id", referencedColumnName="id")
      */
     protected $level;
 
     /**
-     * @ORM\ManyToOne(targetEntity="User", inversedBy="log")
+     * @ORM\ManyToOne(targetEntity="User")
      * @ORM\JoinColumn(name="user_id", referencedColumnName="id")
      */
     protected $user;

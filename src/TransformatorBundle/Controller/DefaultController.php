@@ -29,7 +29,7 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
     public function csiAction(Request $request)
     {
         $this->setUnlimitedResources();
-        $operations = $this->get('transformator.utils.file_operations');
+        $operations = $this->get('transformator.utils.csi_parser');
 
         $operations->processCSI();
 
@@ -42,7 +42,7 @@ class DefaultController extends Controller implements TokenAuthenticatedControll
     public function msmtAction(Request $request)
     {
         $this->setUnlimitedResources();
-        $operations = $this->get('transformator.utils.file_operations');
+        $operations = $this->get('transformator.utils.msmt_parser');
 
         $operations->processMSMT();
 

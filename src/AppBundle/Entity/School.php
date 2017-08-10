@@ -11,13 +11,13 @@ use Doctrine\ORM\Mapping as ORM;
 class School
 {
     /**
-     * @ORM\Id
      * @ORM\Column(type="integer")
      * @ORM\GeneratedValue
      */
     protected $id;
 
     /**
+     * @ORM\Id
      * @ORM\Column(name="code",type="string",length=30)
      */
     protected $code;

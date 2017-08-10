@@ -30,10 +30,21 @@ services:
         arguments: ["%transformator.token%"]
         tags:
             - { name: kernel.event_listener, event: kernel.controller, method: onKernelController }
-    transformator.utils.file_operations:
-        class: TransformatorBundle\Utils\FileOperations
-        arguments: ["@security.token_storage", "@doctrine.orm.entity_manager", "%data.msmt%"]
+    transformator.utils.msmt_parser:
+        class: TransformatorBundle\Utils\MsmtParser
+        arguments: ["@security.token_storage", "@doctrine.orm.entity_manager", "@transformator.utils.dumping_service", "%data.msmt%"]
+    transformator.utils.csi_parser:
+        class: TransformatorBundle\Utils\CsiParser
+        arguments: ["@security.token_storage", "@doctrine.orm.entity_manager", "@transformator.utils.dumping_service"]
+
+    transformator.utils.dumping_service:
+        class: TransformatorBundle\Utils\DumpingService
+        arguments: ["@session"]
 
     transformator.utils.build:
         class: TransformatorBundle\Utils\Build
-        arguments: ["@security.token_storage", "@ci.restclient", "@doctrine.orm.entity_manager", "@session", "%elastic.address%", "%elastic.index%", "%elastic.type%", "%googleMaps.key%"]
+        arguments: ["@security.token_storage", "@doctrine.orm.entity_manager", "@transformator.utils.geolocation", "@transformator.utils.dumping_service", "%elastic.address%", "%elastic.index%", "%elastic.type%"]
+
+    transformator.utils.geolocation:
+        class: TransformatorBundle\Utils\Geolocation
+        arguments: ["@ci.restclient", "@transformator.utils.dumping_service", "%googleMaps.key%"]

@@ -3,23 +3,23 @@
 namespace TransformatorBundle\Utils;
 
 use AppBundle\Entity;
-use Ci\RestClientBundle\Exceptions\OperationTimedOutException;
-use Ci\RestClientBundle\Services\RestClient;
 use Doctrine\ORM\EntityManager;
 use Elasticsearch\ClientBuilder;
 use Elasticsearch\Common\Exceptions\NoNodesAvailableException;
 use Nette\Utils\Json;
 use Nette\Utils\JsonException;
-use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
 
 class Build {
 
-    /** @var RestClient */
-    private $restClient;
-
     /** @var EntityManager */
     private $em;
+
+    /** @var Geolocation */
+    private $geolocation;
+
+    /** @var DumpingService */
+    private $dumpingService;
 
     private $user;
 
@@ -29,62 +29,39 @@ class Build {
     /** @var \Elasticsearch\Client */
     private $elastic;
 
-    /** @var Session */
-    private $session;
-
     private $elasticIndex;
     private $elasticType;
-    private $googleMapsKey;
 
     private $currentSchool;
     private $reportEnabled = TRUE;
     private $locationLevel = NULL;
     private $vars = [];
-    private $lastTime = 0;
 
-	public function __construct(TokenStorage $tokenStorage, $restClient, $entityManager, $session, $elasticAddress, $elasticIndex, $elasticType, $googleMapsKey) {
+	public function __construct(TokenStorage $tokenStorage, EntityManager $entityManager, Geolocation $geolocation,
+                                DumpingService $dumpingService, $elasticAddress, $elasticIndex, $elasticType) {
         mb_internal_encoding("UTF-8");
-
-        $this->restClient = $restClient;
 
         // testing mode
         if ($tokenStorage->getToken() === NULL)
             return;
 
         $this->em = $entityManager;
-        $this->session = $session;
+        $this->geolocation = $geolocation;
+        $this->dumpingService = $dumpingService;
 
         $this->user = $this->em->getRepository('AppBundle:User')->find($tokenStorage->getToken()->getUser()->getId());
         $this->schoolRepository = $this->em->getRepository('AppBundle:School');
         $this->levelRepository = $this->em->getRepository('AppBundle:Level');
         $this->logRepository = $this->em->getRepository('AppBundle:Log');
 
-        dump($elasticAddress);
         // configure elastic connection
         $this->elastic = ClientBuilder::create()
-        ->setHosts([ $elasticAddress ])
-        ->build();
+            ->setHosts([ $elasticAddress ])
+            ->build();
 
         $this->elasticIndex = $elasticIndex;
         $this->elasticType = $elasticType;
-        $this->googleMapsKey = $googleMapsKey;
 	}
-
-	private function toDumpString($message) {
-	    if (is_scalar($message)) {
-	        return $message;
-        } else {
-            return print_r($message, TRUE);
-        }
-    }
-
-	private function dump($message) {
-	    $this->session->getFlashBag()->add("info", $this->toDumpString($message));
-    }
-
-    private function error($message) {
-        $this->session->getFlashBag()->add("danger", $this->toDumpString($message));
-    }
 
     /**
      * Do the build - loop through all the schools:
@@ -140,7 +117,7 @@ class Build {
 
             $isValid = $empty ? FALSE : $this->validateDocument($schoolJson);
             if (!$isValid) {
-                $this->error($schoolJson);
+                $this->dumpingService->error($schoolJson);
             }
 
             $school->setLastBuildJsonData(Json::encode($schoolJson));
@@ -154,13 +131,13 @@ class Build {
                 $this->em->clear();
             }
 
-            // $this->dump(Json::encode($schoolJson, Json::PRETTY));
+            // $this->dumpingService->dump(Json::encode($schoolJson, Json::PRETTY));
 
             $total++;
         }
         $this->em->flush();
 
-        $this->dump("successful: $successful/$total");
+        $this->dumpingService->dump("successful: $successful/$total");
     }
 
     /**
@@ -207,7 +184,7 @@ class Build {
             if ($schoolAddress) {
                 if (!$schoolLocation) {
                     $someLocationMissing = TRUE;
-                    $schoolLocation = $this->retrieveLocation($schoolAddress);
+                    $schoolLocation = $this->geolocation->retrieveLocation($schoolAddress, $this->vars);
                     if ($schoolLocation) {
                         $newLocationFound = TRUE;
                     }
@@ -231,16 +208,16 @@ class Build {
                             if ($schoolAddress && $this->areAddressesEqual($schoolAddress, $address)) {
                                 $location = $schoolLocation;
                                 $addressesEqual++;
-                                $this->dump("equal");
+                                $this->dumpingService->dump("equal");
                             } else {
                                 $addressesNotEqual++;
-                                $location = $this->retrieveLocation($address);
-                                $this->dump("not equal");
+                                $location = $this->geolocation->retrieveLocation($address, $this->vars);
+                                $this->dumpingService->dump("not equal");
                                 if ($schoolLocation) {
                                     $location = $schoolLocation;
-                                    $this->dump("location found");
+                                    $this->dumpingService->dump("location found");
                                 } else {
-                                    $this->dump("location not found");
+                                    $this->dumpingService->dump("location not found");
                                 }
                             }
                         } else {
@@ -261,7 +238,7 @@ class Build {
             }
 
             if ($newLocationFound) {
-                $this->dump($json);
+                $this->dumpingService->dump($json);
                 if ($this->logSchoolLocation($json, $school)) {
                     $successful++;
                 }
@@ -280,9 +257,9 @@ class Build {
 
         $this->em->flush();
 
-        $this->dump("successful: $successful/$total");
-        $this->dump("addresses equal/not equal: $addressesEqual/$addressesNotEqual");
-        $this->dump($this->vars);
+        $this->dumpingService->dump("successful: $successful/$total");
+        $this->dumpingService->dump("addresses equal/not equal: $addressesEqual/$addressesNotEqual");
+        $this->dumpingService->dump($this->vars);
     }
 
     private function createUnitWithLocation($lat, $lon) {
@@ -296,154 +273,6 @@ class Build {
     }
 
     /**
-     * Retrieve GPS location from different services.
-     * @param $address object Address object
-     * @return object
-     */
-    public function retrieveLocation($address) {
-        $location = $this->retrieveNominatimLocation($address);
-        if ($location) {
-            $this->vars['nominatim1']++;
-        } else {
-            $location = $this->retrieveNominatimLocation($address, TRUE);
-            
-            if ($location) {
-                $this->vars['nominatim2']++;
-            } else {
-                $location = $this->retrieveGoogleMapsLocation($address);
-                
-                if ($location) {
-                    $this->vars['google']++;
-                } else {
-                    $this->error("Address not found:");
-                    $this->error($address);
-                    $this->vars['none']++;
-                }
-            }
-        }
-
-        return $location;
-    }
-
-    /**
-     * Retrieve the precise location of given address from openstreetmap.org
-     * @param $address object Address object
-     * @param $omitCity bool Omit city in the url
-     * @return object Location object
-     */
-    public function retrieveNominatimLocation($address, $omitCity = FALSE) {
-        $url = $this->createNominatimUrl($address, $omitCity);
-
-        $json = "";
-        try {
-            // sleep to prevent overrunning the one request-per-second limit
-            $time = microtime(TRUE);
-            if ($time - $this->lastTime < 1.0) {
-                $time = 1.0 - ($time - $this->lastTime);
-                usleep(intval($time * 1000000));
-            }
-            $this->lastTime = $time;
-            $response = $this->restClient->get($url);
-            $json = $response->getContent();
-        } catch (OperationTimedOutException $exception) {
-            $this->error("Couldn't retrieve location information at openstreetmap.org, server not responding.");
-            return NULL;
-        }
-
-        $location = NULL;
-        try {
-            $location = Json::decode($json);
-            if (empty($location) || !isset($location[0]->lat) || !isset($location[0]->lon)) {
-                $location = NULL;
-            } else {
-                $location = $location[0];
-            }
-        } catch (JsonException $e) {
-            $this->error($e->getMessage());
-            $this->error($json);
-        }
-
-        return $location;
-    }
-
-    /**
-     * Retrieve the precise location of given address from Google Maps API
-     * @param $address object Address object
-     * @return object Location object
-     */
-    public function retrieveGoogleMapsLocation($address) {
-        $url = $this->createGoogleMapsUrl($address);
-
-        $json = "";
-        try {
-            $response = $this->restClient->get($url);
-            $json = $response->getContent();
-        } catch (OperationTimedOutException $exception) {
-            $this->error("Couldn't retrieve location information at Google Maps, server not responding.");
-            return NULL;
-        }
-
-        $location = NULL;
-        try {
-            $location = Json::decode($json);
-            if (!empty($location) && $location->status == "OK") {
-                $location = $location->results[0]->geometry->location;
-                $location->lon = $location->lng;
-            } else {
-                $this->error($address);
-                if ($location) {
-                    $this->error("status: " . $location->status);
-                }
-                $location = NULL;
-            }
-        } catch (JsonException $e) {
-            $this->error($e->getMessage());
-            $this->error($json);
-        }
-
-        return $location;
-    }
-
-
-    /**
-     * Create the URL address for the Nominatim API from the given address.
-     * @param $address object Address object
-     * @param $omitCity bool Omit city in the URL
-     * @return string
-     */
-    public function createNominatimUrl($address, $omitCity = FALSE) {
-        $url = 'http://nominatim.openstreetmap.org/search?format=json&countrycodes=CZ&q=';
-        $url .= $this->getAddressQuery($address, $omitCity);
-        return $url;
-    }
-
-    /**
-     * Create the URL address for the Google Maps API from the given address.
-     * @param $address object Address object
-     * @return string
-     */
-    public function createGoogleMapsUrl($address) {
-        $url = 'https://maps.googleapis.com/maps/api/geocode/json?address=';
-        $url .= $this->getAddressQuery($address);
-        $url .= '&key=' . $this->googleMapsKey;
-        return $url;
-    }
-
-    private function getAddressQuery($address, $omitCity = FALSE) {
-        $components = [];
-        if (!empty($address->street)) {
-            $components[] = $address->street;
-        }
-        if (!empty($address->city) && !$omitCity) {
-            $components[] = $address->city;
-        }
-        if (!empty($address->postalCode)) {
-            $components[] = $address->postalCode;
-        }
-        return urlencode(implode(', ', $components) . ", Czech Republic");
-    }
-
-    /**
      * Log the location json to DB
      * @param $json object
      * @param $school array
@@ -454,8 +283,8 @@ class Build {
         try {
             $data = Json::encode($json);
         } catch (JsonException $e) {
-            $this->error($json);
-            $this->error($e->getMessage());
+            $this->dumpingService->error($json);
+            $this->dumpingService->error($e->getMessage());
             return FALSE;
         }
 
@@ -480,7 +309,7 @@ class Build {
         try {
             $documents = $this->retrieveExistingDocuments();
         } catch (NoNodesAvailableException $e) {
-            $this->error("Elastic server not responding: " . $e->getMessage());
+            $this->dumpingService->error("Elastic server not responding: " . $e->getMessage());
             return;
         }
         $schools = $this->em->createQuery(
@@ -530,10 +359,10 @@ class Build {
             $deleted++;
         }
 
-        $this->dump("successful: $successful/$total");
-        $this->dump("updated: $updated");
-        $this->dump("inserted: $inserted");
-        $this->dump("deleted: $deleted");
+        $this->dumpingService->dump("successful: $successful/$total");
+        $this->dumpingService->dump("updated: $updated");
+        $this->dumpingService->dump("inserted: $inserted");
+        $this->dumpingService->dump("deleted: $deleted");
     }
 
     public function retrieveExistingDocuments() {
@@ -796,7 +625,7 @@ class Build {
 
     public function report($message) {
         if ($this->reportEnabled) {
-            $this->error("School $this->currentSchool invalid: $message");
+            $this->dumpingService->error("School $this->currentSchool invalid: $message");
         }
     }
 
